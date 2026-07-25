@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>FrontEndSuite.PdfPlatform</RootNamespace>
+    <AssemblyName>PdfPlatform</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>PdfPlatform</PackageId>
+    <Description>A pure C# PDF library for creating, parsing, and manipulating PDF documents.</Description>
+    <RepositoryUrl>https://github.com/ThadPinch/pdfplatform</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+  </ItemGroup>
+
+</Project>
