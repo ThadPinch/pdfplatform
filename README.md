@@ -60,7 +60,7 @@ Show-operator strings are decoded the way a viewer decodes them: via `/ToUnicode
 | **Inspection** | Color-space description, spot-colorant collection, font-embedding checks (`PdfInspection`) |
 | **Annotations** | Text annotations (contents, color, author, subject, icon), URI link annotations, generic annotation access on any page |
 | **Layout** | Flow-layout engine: styled paragraphs and runs, percent-column tables with colspan, nesting, borders, backgrounds and repeated headers, images, rules, hyperlinks, automatic page breaks |
-| **Barcodes** | QR code generator (all error-correction levels) emitting resolution-independent vector form XObjects |
+| **Barcodes** | QR codes (all error-correction levels) and 1D barcodes — Code 128 (auto subset A/B/C), Code 39, EAN-13, UPC-A, Interleaved 2 of 5 — all emitted as resolution-independent vector form XObjects |
 | **Geometry** | Matrix algebra, rectangles with box semantics, point/inch unit conversion |
 
 ---
@@ -205,6 +205,22 @@ flow.Add(para);
 
 Tables support percent-based columns, colspan, nesting, cell borders, padding, backgrounds, and headers that repeat across page breaks.
 
+### Barcodes: vector QR and 1D codes
+
+```csharp
+var barcode = Barcode1D.Encode("PDFPLATFORM-2026", BarcodeSymbology.Code128);
+var form = barcode.CreateFormXObject(doc, heightModules: 60);
+
+// One form-space unit = one module; scale to the final printed size on placement.
+var scale = 216f / barcode.WidthWithQuietZones; // 3" wide
+canvas.AddFormXObject(form, scale, 0, 0, 1, 72, 400);
+
+var qr = QrCode.Encode("https://example.com/track/10422", QrErrorCorrection.M);
+canvas.AddFormXObject(qr.CreateFormXObject(doc), 2, 0, 0, 2, 400, 380);
+```
+
+Code 128 selects subsets A/B/C automatically (with digit compaction), EAN-13/UPC-A check digits are computed or validated for you, and every symbology draws as pure vectors with the correct quiet zones built into the bounding box — no rasterization at any size.
+
 ---
 
 ## Built for prepress
@@ -214,7 +230,7 @@ PdfPlatform's feature set maps one-to-one onto the subsystems of a print product
 - **File intake & repair** — recovery parsing turns damaged customer uploads into workable documents, with an audit trail of what was repaired.
 - **Preflight** — per-image effective DPI, font-embedding checks, spot-colorant enumeration, color-space description, invisible-text detection, page-box validation (trim/bleed/art), all via public APIs with no rendering step.
 - **Imposition** — import any page from any document as a form XObject and place it with full matrix control: step-and-repeat, N-up, cut-and-stack, work-and-turn. Content deduplication keeps ganged sheets small.
-- **Variable data printing (VDP)** — shared static content as form XObjects plus per-record canvas drawing, aligned text, wrapped text, and vector QR codes for tracking and mail.
+- **Variable data printing (VDP)** — shared static content as form XObjects plus per-record canvas drawing, aligned text, wrapped text, and vector QR codes and 1D barcodes (Code 128, Code 39, EAN/UPC, ITF) for tracking, mail, and retail.
 - **Dielines, varnish, and white ink** — Separation color spaces with proper tint transforms, drawn into optional content groups your RIP and your customers can toggle.
 - **Layer processing** — flatten proofing or versioning layers permanently before output with `ContentLayerFlattener`.
 - **Document assembly** — merge, reorder, stamp, and splice content before or after existing page content without disturbing it.
