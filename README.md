@@ -39,6 +39,36 @@ The COS layer (`CosDictionary`, `CosArray`, `CosStream`, `CosName`, `CosString`,
 
 Show-operator strings are decoded the way a viewer decodes them: via `/ToUnicode` CMaps when present, `/Encoding /Differences` glyph names for simple fonts, Latin-1 otherwise.
 
+### It's fast — measured, not claimed
+
+Benchmarked head-to-head against the leading commercial PDF library for .NET on 39 real print-production PDFs — business cards, inserts, wide-format posters, program booklets, up to 216 MB press-ready scans (706 MB total). Same bytes handed to both engines in a single .NET 10 Release process; disk I/O excluded; forced GC between iterations; JIT warmup; best-of-N wall time. Speedup is the geometric mean of per-file ratios (their time ÷ PdfPlatform time — higher is better for PdfPlatform):
+
+| Operation | Speedup | Per-file range | Corpus total (theirs → PdfPlatform) | Allocation ratio |
+|---|---:|---:|---:|---:|
+| Open + read page boxes | **11.57×** | 1.8–332× | 332 ms → 26 ms | 33.7× |
+| Content interpretation (preflight-style walk) | **3.45×** | 1.4–32× | 70.6 s → 51.0 s | 2.8× |
+| Load → save round-trip | **2.54×** | 0.9–5.1× | 10.7 s → 6.4 s | 1.8× |
+| Set page boxes + save | **2.53×** | 1.0–5.0× | 10.7 s → 6.4 s | 1.8× |
+| Merge (copy all pages to a new document) | **2.39×** | 1.3–4.4× | 12.1 s → 6.7 s | 1.8× |
+| Variable-data assembly, 25 records | **1.66×** | 1.0–2.9× | 36 ms → 27 ms | 2.8× |
+| Generate 100 pages from scratch | 0.58× | — | 19 ms → 34 ms | 2.5× |
+
+The open advantage grows with file size — 4.6× under 1 MB, 76× at 50 MB and above — because PdfPlatform parses the xref and loads objects on demand, so a 216 MB press file opens in ~0.6 ms. Allocation ratio is the incumbent's managed allocations ÷ PdfPlatform's: consistently 1.8–2.8× less GC pressure on heavy operations, 34× less on opens — which is real money in serverless, where memory is the billing dial.
+
+**Output size, too.** Accumulating 25 separately-loaded copies of a record into one document (the variable-data assembly pattern), `PdfImporter`'s content-hash deduplication stores byte-identical subgraphs — template streams, images, fonts — exactly once, where the incumbent's page copy re-embeds them per record:
+
+| Record source | Their output | PdfPlatform output |
+|---:|---:|---:|
+| 62 KB | 1.5 MB | **68 KB** |
+| 97 KB | 2.1 MB | **247 KB** |
+| 183 KB | 4.3 MB | **187 KB** |
+
+At production scale this compounds: 50 records of a 308 KB template measured 15.4 MB via the incumbent vs **340 KB** deduped — 45× smaller, pixel-identical render.
+
+**And correct.** Every timed run computed a fingerprint of what it read — page-box width sums across all pages, raw-TrimBox presence counts, and total interpreter text/image/path event counts. All 39 files produced identical fingerprints from both engines with zero parse failures on either side, and the write paths produced equivalent output sizes (round-trip 1.01, box mutation 1.01, merge 1.00).
+
+**Where the incumbent wins**, in fairness: generating 100 dense pages from scratch (19 ms vs 34 ms — its writer streams objects out as pages complete, PdfPlatform serializes by reachability after building; sub-millisecond difference at typical invoice sizes), one 108 MB scanned file that round-tripped 15% slower (the only file in the corpus where PdfPlatform lost at anything), and format breadth PdfPlatform deliberately omits: encryption, incremental-update writing, tagged PDF / PDF-A, signatures, and AcroForm creation.
+
 ---
 
 ## Feature matrix
